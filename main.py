@@ -2,9 +2,12 @@ import asyncio
 
 from pylitterbot import Account
 
-# Set email and password for initial authentication.
-username = "Your username"
-password = "Your password"
+from config import Config
+
+# Load configuration from environment variables
+config = Config()
+username = config.credentials.username
+password = config.credentials.password
 
 
 async def main():
