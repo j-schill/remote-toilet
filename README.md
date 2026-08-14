@@ -5,6 +5,5 @@ My cat uses the Whisker Litter Robot 3 and loves it.  The data from the applicat
 # Usage
 ```
 docker build -t remote-toilet .
-
-docker run -e WHISKER_USERNAME=your_user -e WHISKER_PASSWORD=your_pass remote-toilet
+docker run remote-toilet
 ```
