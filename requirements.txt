@@ -1,3 +1,4 @@
 pylitterbot
 asyncio
 python-dotenv
+prefect
