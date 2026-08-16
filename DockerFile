@@ -21,7 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code and config
 COPY main.py .
-COPY config.py .
+COPY core/config.py .
 COPY .env .
 
 # Run the application

@@ -1,0 +1,47 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Main Flow",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "python": "C:\\Users\\joshs\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false,
+            "purpose": [
+                "debug-in-terminal"
+            ]
+        },
+        {
+            "name": "Python: Sync Usage History",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/services/batch_usage_sync.py",
+            "python": "C:\\Users\\joshs\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        },
+        {
+            "name": "Python: Alert Check",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/services/batch_alert_check.py",
+            "python": "C:\\Users\\joshs\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "justMyCode": false
+        }
+    ]
+}

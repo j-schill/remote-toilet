@@ -2,3 +2,4 @@ pylitterbot
 asyncio
 python-dotenv
 prefect
+tzdata

@@ -2,9 +2,9 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Any
 
-from config import Config
 from pylitterbot import Account
 
+from core.config import Config
 from core.usage_store import (
     CENTRAL_TZ,
     as_record_mapping,

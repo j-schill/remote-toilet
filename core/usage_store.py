@@ -4,15 +4,20 @@ import json
 import os
 import sqlite3
 from collections.abc import Iterable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
+
+try:
+    from zoneinfo import ZoneInfo
+
+    CENTRAL_TZ = ZoneInfo("America/Chicago")
+except Exception:
+    CENTRAL_TZ = timezone(timedelta(hours=-6))
 
 _DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "data" / "remote_toilet.db"
 DB_PATH = Path(os.getenv("REMOTE_TOILET_DB_PATH", str(_DEFAULT_DB_PATH)))
-CENTRAL_TZ = ZoneInfo("America/Chicago")
 
 
 def now_in_central() -> datetime:
@@ -26,13 +31,21 @@ def to_central_time(value: datetime) -> datetime:
 
 
 def get_db_path() -> Path:
-    return Path(os.getenv("REMOTE_TOILET_DB_PATH", str(_DEFAULT_DB_PATH))).expanduser()
+    configured = os.getenv("REMOTE_TOILET_DB_PATH")
+    if configured:
+        candidate = Path(configured).expanduser()
+        if not candidate.is_absolute():
+            candidate = (Path(__file__).resolve().parents[1] / candidate).resolve()
+        return candidate
+    return _DEFAULT_DB_PATH
 
 
 def get_db_connection(
     db_path: str | os.PathLike[str] | None = None,
 ) -> sqlite3.Connection:
     target = Path(db_path) if db_path is not None else get_db_path()
+    if not target.is_absolute():
+        target = (Path(__file__).resolve().parents[1] / target).resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(target))
     conn.row_factory = sqlite3.Row
@@ -158,14 +171,8 @@ def _pick_timestamp(record: dict[str, Any]) -> str | None:
 
 
 def _make_record_id(robot_id: str, record: dict[str, Any]) -> str:
-    event_id = (
-        record.get("id")
-        or record.get("event_id")
-        or record.get("cycle_id")
-        or _pick_timestamp(record)
-        or str(record)
-    )
-    raw = f"{robot_id}|{_normalize_event_type(record)}|{event_id}"
+    payload = json.dumps(record, default=str, sort_keys=True, separators=(",", ":"))
+    raw = f"{robot_id}|{payload}"
     return sha256(raw.encode("utf-8")).hexdigest()
 
 
@@ -261,8 +268,14 @@ def query_usage_history_by_event(
 def is_clean_cycle_complete(event_name: str | None) -> bool:
     if event_name is None:
         return False
-    cleaned = str(event_name).strip().lower().replace("_", " ")
-    cleaned = cleaned.replace("-", " ")
+
+    cleaned = str(event_name).strip().lower()
+    cleaned = cleaned.replace("_", " ").replace("-", " ").replace(".", " ")
+    cleaned = " ".join(cleaned.split())
+
+    if cleaned in {"ccc", "clean cycle complete", "clean cycle", "cycle complete"}:
+        return True
+
     return (
         "clean cycle complete" in cleaned
         or "clean cycle" in cleaned
