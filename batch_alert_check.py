@@ -6,7 +6,12 @@ from email.message import EmailMessage
 from typing import Any
 from urllib import error, request
 
-from usage_store import get_db_connection, is_clean_cycle_complete
+from usage_store import (
+    CENTRAL_TZ,
+    get_db_connection,
+    is_clean_cycle_complete,
+    now_in_central,
+)
 
 
 def send_ntfy_notification(topic: str, title: str, message: str) -> None:
@@ -58,7 +63,7 @@ def send_email_notification(subject: str, body: str) -> None:
 
 def check_clean_cycle_alert(threshold: int = 5, days_back: int = 7) -> dict[str, Any]:
     conn = get_db_connection()
-    cutoff = (datetime.utcnow() - timedelta(days=days_back)).isoformat()
+    cutoff = (now_in_central() - timedelta(days=days_back)).isoformat()
     rows = conn.execute(
         "SELECT event_type, event_time FROM usage_history WHERE event_time >= ? ORDER BY event_time ASC",
         (cutoff,),
@@ -75,14 +80,16 @@ def check_clean_cycle_alert(threshold: int = 5, days_back: int = 7) -> dict[str,
         try:
             dt = datetime.fromisoformat(str(event_time).replace("Z", "+00:00"))
             if dt.tzinfo is not None:
-                dt = dt.astimezone().replace(tzinfo=None)
+                dt = dt.astimezone(CENTRAL_TZ)
+            else:
+                dt = dt.replace(tzinfo=CENTRAL_TZ)
             day_key = dt.date().isoformat()
         except ValueError:
             continue
 
         counts_by_day[day_key] = counts_by_day.get(day_key, 0) + 1
 
-    today = datetime.utcnow().date().isoformat()
+    today = now_in_central().date().isoformat()
     count = counts_by_day.get(today, 0)
     triggered = count > threshold
 

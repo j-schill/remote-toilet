@@ -9,7 +9,20 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
+from zoneinfo import ZoneInfo
+
 DB_PATH = Path(os.getenv("REMOTE_TOILET_DB_PATH", "remote_toilet.db"))
+CENTRAL_TZ = ZoneInfo("America/Chicago")
+
+
+def now_in_central() -> datetime:
+    return datetime.now(CENTRAL_TZ)
+
+
+def to_central_time(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=CENTRAL_TZ)
+    return value.astimezone(CENTRAL_TZ)
 
 
 def get_db_path() -> Path:
@@ -100,7 +113,8 @@ def _pick_timestamp(record: dict[str, Any]) -> str | None:
         if key in record:
             dt = _coerce_datetime(record[key])
             if dt is not None:
-                return dt.isoformat()
+                central_dt = to_central_time(dt)
+                return central_dt.isoformat()
     return None
 
 
@@ -118,7 +132,7 @@ def _make_record_id(robot_id: str, record: dict[str, Any]) -> str:
 
 def normalize_usage_record(robot_id: str, record: dict[str, Any]) -> dict[str, Any]:
     event_type = _normalize_event_type(record)
-    event_time = _pick_timestamp(record) or datetime.utcnow().isoformat()
+    event_time = _pick_timestamp(record) or now_in_central().isoformat()
     return {
         "id": _make_record_id(robot_id, record),
         "robot_id": str(robot_id),
@@ -163,11 +177,37 @@ def store_new_usage_records(
 
 
 def iter_recent_usage_records(days_back: int = 14) -> list[dict[str, Any]]:
-    cutoff = datetime.utcnow() - timedelta(days=days_back)
+    cutoff = now_in_central() - timedelta(days=days_back)
     conn = get_db_connection()
     rows = conn.execute(
         "SELECT robot_id, event_type, event_time, raw_json FROM usage_history WHERE event_time >= ? ORDER BY event_time ASC",
         (cutoff.isoformat(),),
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def query_usage_history_by_day(day: str | datetime, limit: int = 1000) -> list[dict[str, Any]]:
+    if isinstance(day, datetime):
+        day_key = day.date().isoformat()
+    else:
+        day_key = str(day)
+
+    conn = get_db_connection()
+    rows = conn.execute(
+        "SELECT robot_id, event_type, event_time, raw_json FROM usage_history WHERE date(event_time) = ? ORDER BY event_time ASC LIMIT ?",
+        (day_key, limit),
+    ).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def query_usage_history_by_event(event_type: str, days_back: int = 14) -> list[dict[str, Any]]:
+    cutoff = now_in_central() - timedelta(days=days_back)
+    conn = get_db_connection()
+    rows = conn.execute(
+        "SELECT robot_id, event_type, event_time, raw_json FROM usage_history WHERE event_type = ? AND event_time >= ? ORDER BY event_time ASC",
+        (event_type, cutoff.isoformat()),
     ).fetchall()
     conn.close()
     return [dict(row) for row in rows]

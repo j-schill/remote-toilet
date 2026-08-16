@@ -5,7 +5,7 @@ from typing import Any
 from pylitterbot import Account
 
 from config import Config
-from usage_store import get_db_connection, store_new_usage_records
+from usage_store import CENTRAL_TZ, get_db_connection, now_in_central, store_new_usage_records
 
 config = Config()
 
@@ -27,7 +27,7 @@ async def fetch_recent_usage_history(
     )
     candidate_attrs = ("usage_history", "activity_history", "history", "activities")
 
-    cutoff = datetime.utcnow() - timedelta(days=days_back)
+    cutoff = now_in_central() - timedelta(days=days_back)
     records: list[dict[str, Any]] = []
 
     for name in candidate_methods:
@@ -76,7 +76,9 @@ async def fetch_recent_usage_history(
                 except ValueError:
                     continue
                 if dt.tzinfo is not None:
-                    dt = dt.astimezone().replace(tzinfo=None)
+                    dt = dt.astimezone(CENTRAL_TZ)
+                else:
+                    dt = dt.replace(tzinfo=CENTRAL_TZ)
                 if dt >= cutoff:
                     records.append(item)
             if records:
@@ -111,7 +113,9 @@ async def fetch_recent_usage_history(
                 except ValueError:
                     continue
                 if dt.tzinfo is not None:
-                    dt = dt.astimezone().replace(tzinfo=None)
+                    dt = dt.astimezone(CENTRAL_TZ)
+                else:
+                    dt = dt.replace(tzinfo=CENTRAL_TZ)
                 if dt >= cutoff:
                     records.append(item)
             if records:
