@@ -8,10 +8,10 @@ from datetime import datetime, timedelta
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
-
 from zoneinfo import ZoneInfo
 
-DB_PATH = Path(os.getenv("REMOTE_TOILET_DB_PATH", "remote_toilet.db"))
+_DEFAULT_DB_PATH = Path(__file__).resolve().parents[1] / "data" / "remote_toilet.db"
+DB_PATH = Path(os.getenv("REMOTE_TOILET_DB_PATH", str(_DEFAULT_DB_PATH)))
 CENTRAL_TZ = ZoneInfo("America/Chicago")
 
 
@@ -26,7 +26,7 @@ def to_central_time(value: datetime) -> datetime:
 
 
 def get_db_path() -> Path:
-    return Path(DB_PATH).expanduser()
+    return Path(os.getenv("REMOTE_TOILET_DB_PATH", str(_DEFAULT_DB_PATH))).expanduser()
 
 
 def get_db_connection(
@@ -93,10 +93,49 @@ def _coerce_datetime(value: Any) -> datetime | None:
     return None
 
 
+def as_record_mapping(record: Any) -> dict[str, Any]:
+    if record is None:
+        return {}
+    if isinstance(record, dict):
+        return record
+    if hasattr(record, "dict") and callable(record.dict):
+        try:
+            value = record.dict()
+            if isinstance(value, dict):
+                return value
+        except Exception:
+            pass
+    if hasattr(record, "as_dict") and callable(record.as_dict):
+        try:
+            value = record.as_dict()
+            if isinstance(value, dict):
+                return value
+        except Exception:
+            pass
+    if hasattr(record, "__dict__"):
+        return {
+            key: value for key, value in vars(record).items() if not key.startswith("_")
+        }
+    return {}
+
+
+def _unwrap_enum_value(value: Any) -> Any:
+    if value is None:
+        return None
+    if hasattr(value, "value"):
+        return value.value
+    if hasattr(value, "name"):
+        return value.name
+    return value
+
+
 def _normalize_event_type(record: dict[str, Any]) -> str:
-    for key in ("event_type", "type", "status", "name", "description"):
+    for key in ("event_type", "type", "status", "name", "description", "action"):
         value = record.get(key)
-        if value:
+        if value is None:
+            continue
+        value = _unwrap_enum_value(value)
+        if value is not None:
             return str(value)
     return "usage"
 
@@ -131,6 +170,7 @@ def _make_record_id(robot_id: str, record: dict[str, Any]) -> str:
 
 
 def normalize_usage_record(robot_id: str, record: dict[str, Any]) -> dict[str, Any]:
+    record = as_record_mapping(record)
     event_type = _normalize_event_type(record)
     event_time = _pick_timestamp(record) or now_in_central().isoformat()
     return {
@@ -147,7 +187,8 @@ def store_new_usage_records(
 ) -> int:
     inserted = 0
     for record in records:
-        if not isinstance(record, dict):
+        record = as_record_mapping(record)
+        if not record:
             continue
         normalized = normalize_usage_record(robot_id, record)
         cursor = conn.execute(
@@ -187,7 +228,9 @@ def iter_recent_usage_records(days_back: int = 14) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
-def query_usage_history_by_day(day: str | datetime, limit: int = 1000) -> list[dict[str, Any]]:
+def query_usage_history_by_day(
+    day: str | datetime, limit: int = 1000
+) -> list[dict[str, Any]]:
     if isinstance(day, datetime):
         day_key = day.date().isoformat()
     else:
@@ -202,7 +245,9 @@ def query_usage_history_by_day(day: str | datetime, limit: int = 1000) -> list[d
     return [dict(row) for row in rows]
 
 
-def query_usage_history_by_event(event_type: str, days_back: int = 14) -> list[dict[str, Any]]:
+def query_usage_history_by_event(
+    event_type: str, days_back: int = 14
+) -> list[dict[str, Any]]:
     cutoff = now_in_central() - timedelta(days=days_back)
     conn = get_db_connection()
     rows = conn.execute(
@@ -216,9 +261,11 @@ def query_usage_history_by_event(event_type: str, days_back: int = 14) -> list[d
 def is_clean_cycle_complete(event_name: str | None) -> bool:
     if event_name is None:
         return False
-    cleaned = event_name.strip().lower().replace("_", " ")
+    cleaned = str(event_name).strip().lower().replace("_", " ")
+    cleaned = cleaned.replace("-", " ")
     return (
         "clean cycle complete" in cleaned
         or "clean cycle" in cleaned
         or "cycle complete" in cleaned
+        or ("clean" in cleaned and "complete" in cleaned)
     )

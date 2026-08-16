@@ -2,10 +2,16 @@ import asyncio
 from datetime import datetime, timedelta
 from typing import Any
 
+from config import Config
 from pylitterbot import Account
 
-from config import Config
-from usage_store import CENTRAL_TZ, get_db_connection, now_in_central, store_new_usage_records
+from core.usage_store import (
+    CENTRAL_TZ,
+    as_record_mapping,
+    get_db_connection,
+    now_in_central,
+    store_new_usage_records,
+)
 
 config = Config()
 
@@ -60,7 +66,8 @@ async def fetch_recent_usage_history(
 
         if isinstance(result, (list, tuple)):
             for item in result:
-                if not isinstance(item, dict):
+                item = as_record_mapping(item)
+                if not item:
                     continue
                 ts = (
                     item.get("timestamp")
@@ -97,7 +104,8 @@ async def fetch_recent_usage_history(
             )
         if isinstance(value, (list, tuple)):
             for item in value:
-                if not isinstance(item, dict):
+                item = as_record_mapping(item)
+                if not item:
                     continue
                 ts = (
                     item.get("timestamp")

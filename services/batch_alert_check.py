@@ -6,7 +6,7 @@ from email.message import EmailMessage
 from typing import Any
 from urllib import error, request
 
-from usage_store import (
+from core.usage_store import (
     CENTRAL_TZ,
     get_db_connection,
     is_clean_cycle_complete,

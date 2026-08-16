@@ -18,8 +18,8 @@ except ImportError:  # pragma: no cover - optional dependency
         return decorator
 
 
-from batch_alert_check import check_clean_cycle_alert
-from batch_usage_sync import sync_usage_history
+from services.batch_alert_check import check_clean_cycle_alert
+from services.batch_usage_sync import sync_usage_history
 
 
 @task(name="sync_usage_history")
