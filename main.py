@@ -4,6 +4,7 @@ from typing import Any
 try:
     from prefect import flow, task
 except ImportError:  # pragma: no cover - optional dependency
+
     def flow(name: str | None = None):
         def decorator(func):
             return func
@@ -15,6 +16,7 @@ except ImportError:  # pragma: no cover - optional dependency
             return func
 
         return decorator
+
 
 from batch_alert_check import check_clean_cycle_alert
 from batch_usage_sync import sync_usage_history
